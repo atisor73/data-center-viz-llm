@@ -36,7 +36,7 @@
     </svg>
     <input
       type="text"
-      placeholder="Search by name, city, state…"
+      placeholder="Search by name, city, full state name (e.g. Illinois)…"
       bind:value={searchQuery}
       class="search"
     />

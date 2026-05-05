@@ -11,6 +11,20 @@
     visibleCount = $bindable(0),
   } = $props();
 
+  const STATE_NAMES = {
+    AL:'alabama', AK:'alaska', AZ:'arizona', AR:'arkansas', CA:'california',
+    CO:'colorado', CT:'connecticut', DE:'delaware', FL:'florida', GA:'georgia',
+    HI:'hawaii', ID:'idaho', IL:'illinois', IN:'indiana', IA:'iowa', KS:'kansas',
+    KY:'kentucky', LA:'louisiana', ME:'maine', MD:'maryland', MA:'massachusetts',
+    MI:'michigan', MN:'minnesota', MS:'mississippi', MO:'missouri', MT:'montana',
+    NE:'nebraska', NV:'nevada', NH:'new hampshire', NJ:'new jersey', NM:'new mexico',
+    NY:'new york', NC:'north carolina', ND:'north dakota', OH:'ohio', OK:'oklahoma',
+    OR:'oregon', PA:'pennsylvania', RI:'rhode island', SC:'south carolina',
+    SD:'south dakota', TN:'tennessee', TX:'texas', UT:'utah', VT:'vermont',
+    VA:'virginia', WA:'washington', WV:'west virginia', WI:'wisconsin', WY:'wyoming',
+    DC:'district of columbia',
+  };
+
   const STATUS_COLOR = {
     'Operating':                             '#48bb78',
     'Proposed':                              '#63b3ed',
@@ -33,12 +47,16 @@
     allData.filter(d => {
       if (!activeStatuses.has(d.status)) return false;
       if (searchQuery) {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.toLowerCase().trim();
+        const stateAbbrev = (d.state || '').toLowerCase();
+        const stateFull = STATE_NAMES[d.state] || '';
         return (
           (d.facility_name || '').toLowerCase().includes(q) ||
           (d.city || '').toLowerCase().includes(q) ||
-          (d.state || '').toLowerCase().includes(q) ||
-          (d.operator_name || '').toLowerCase().includes(q)
+          stateAbbrev === q ||
+          stateFull.includes(q) ||
+          (d.operator_name || '').toLowerCase().includes(q) ||
+          (d.county || '').toLowerCase().includes(q)
         );
       }
       return true;
