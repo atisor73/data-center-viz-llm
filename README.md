@@ -1,1 +1,1 @@
-Data Interaction Project to test the efficacy of chatbot integration on user experience. 
+Data Interaction Project to test the efficacy of chatbot integration on user experience within environmental justice mapping tools. 
