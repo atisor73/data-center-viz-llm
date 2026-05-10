@@ -1,11 +1,18 @@
 import http from 'node:http';
 import { GoogleGenAI } from '@google/genai';
 import { DERIVED_TO_SOURCE_COLUMN, loadDataCenters } from './database.js';
-import { buildSqlPrompt } from './sqlPrompt.js';
+import {
+  VALID_DASHBOARD_STATUSES,
+  buildSqlPrompt,
+  buildSqlUserPrompt,
+  buildSummaryPrompt,
+} from './sqlPrompt.js';
 import 'dotenv/config';
 
 const PORT = Number(process.env.PORT || 3001);
-const MODEL = 'gemini-3-flash-preview';
+const MODEL = 'gemini-3.1-flash-lite';
+const SQL_THINKING_LEVEL = 'medium';
+const SUMMARY_THINKING_LEVEL = 'low';
 const RATE_LIMIT = Number(process.env.CHAT_RPM_LIMIT || 5);
 const WINDOW_MS = 60_000;
 const MAX_MESSAGES = 10;
@@ -22,6 +29,7 @@ let requestTimes = [];
 
 const dataCenters = loadDataCenters(DATA_PATH);
 const SQL_SYSTEM_PROMPT = buildSqlPrompt(dataCenters);
+const VALID_STATUS_SET = new Set(VALID_DASHBOARD_STATUSES);
 
 function sendJson(res, status, payload) {
   res.writeHead(status, {
@@ -51,20 +59,38 @@ function isGeminiRateLimit(error) {
     message.toLowerCase().includes('rate limit');
 }
 
-function getLatestUserMessage(payload) {
+function cleanConversationMessages(payload) {
   const rawMessages = Array.isArray(payload.messages)
     ? payload.messages
     : [{ role: 'user', text: payload.message }];
 
   return rawMessages
     .slice(-MAX_MESSAGES)
-    .reverse()
-    .find((message) => message?.role !== 'assistant' && typeof message?.text === 'string')
-    ?.text
-    ?.trim() || '';
+    .map((message) => ({
+      role: message?.role === 'assistant' ? 'assistant' : 'user',
+      text: typeof message?.text === 'string' ? message.text.trim() : '',
+    }))
+    .filter((message) => message.text);
 }
 
-function parseSqlResponse(text) {
+function getLatestUserMessage(messages) {
+  return messages
+    .reverse()
+    .find((message) => message.role === 'user')
+    ?.text
+    || '';
+}
+
+function getConversationContext(messages) {
+  const latestUserIndex = messages.findLastIndex((message) => message.role === 'user');
+  const contextMessages = latestUserIndex === -1 ? messages : messages.slice(0, latestUserIndex);
+
+  return contextMessages
+    .map((message) => `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${message.text}`)
+    .join('\n');
+}
+
+function parseActionResponse(text) {
   const cleaned = text.trim()
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
@@ -73,7 +99,31 @@ function parseSqlResponse(text) {
 
   const parsed = JSON.parse(cleaned);
   const sql = typeof parsed.sql === 'string' ? parsed.sql.trim() : null;
-  return sql || null;
+  const message = typeof parsed.message === 'string' ? parsed.message.trim() : null;
+
+  return {
+    sql: sql || null,
+    filter: validateDashboardFilter(parsed.filter),
+    message: message || null,
+  };
+}
+
+function validateDashboardFilter(filter) {
+  if (!filter || typeof filter !== 'object') {
+    return null;
+  }
+
+  const searchQuery = typeof filter.searchQuery === 'string'
+    ? filter.searchQuery.trim()
+    : '';
+  const activeStatuses = Array.isArray(filter.activeStatuses)
+    ? filter.activeStatuses.filter((status) => VALID_STATUS_SET.has(status))
+    : [];
+
+  return {
+    searchQuery,
+    activeStatuses: activeStatuses.length ? activeStatuses : VALID_DASHBOARD_STATUSES,
+  };
 }
 
 function validateSql(sql) {
@@ -111,29 +161,6 @@ function validateSql(sql) {
   return cleanSql;
 }
 
-function markdownCell(value) {
-  const text = value === null || value === undefined ? '' : String(value);
-  return text
-    .replaceAll('|', '\\|')
-    .replace(/\s+/g, ' ')
-    .slice(0, 160);
-}
-
-function rowsToMarkdown(rows) {
-  if (!rows.length) {
-    return 'No rows returned.';
-  }
-
-  const columns = Object.keys(rows[0]);
-  const header = `| ${columns.map(markdownCell).join(' | ')} |`;
-  const separator = `| ${columns.map(() => '---').join(' | ')} |`;
-  const body = rows
-    .map((row) => `| ${columns.map((column) => markdownCell(row[column])).join(' | ')} |`)
-    .join('\n');
-
-  return `${header}\n${separator}\n${body}`;
-}
-
 function sqlReferencesColumn(sql, column) {
   return new RegExp(`\\b${column}\\b`, 'i').test(sql);
 }
@@ -161,14 +188,35 @@ function getSparseNotes(sql) {
     ));
 }
 
-function formatSqlReply(sql, rows) {
-  const notes = getSparseNotes(sql);
-  const footerNotes = [
-    ...notes,
-    `Results are limited to ${RESULT_LIMIT} rows.`,
-  ];
-  const noteText = `\n\n${footerNotes.join('\n')}`;
-  return `\`\`\`sql\n${sql}\n\`\`\`\n\n${rowsToMarkdown(rows)}${noteText}`;
+function buildResult(sql, rows, notes) {
+  return {
+    sql,
+    rows,
+    notes,
+    rowLimit: RESULT_LIMIT,
+  };
+}
+
+async function summarizeResult({ conversation, userQuestion, sql, rows, notes }) {
+  const response = await ai.models.generateContent({
+    model: MODEL,
+    contents: buildSummaryPrompt({
+      conversation,
+      userQuestion,
+      sql,
+      rows,
+      notes,
+      rowLimit: RESULT_LIMIT,
+    }),
+    config: {
+      thinkingConfig: {
+        thinkingLevel: SUMMARY_THINKING_LEVEL,
+      },
+    },
+  });
+
+  console.log('Gemini summary response:', response.text || '');
+  return response.text || 'I generated the SQL and results, but Gemini returned an empty summary.';
 }
 
 function readBody(req) {
@@ -208,7 +256,9 @@ async function handleChat(req, res) {
     return;
   }
 
-  const message = getLatestUserMessage(payload);
+  const conversationMessages = cleanConversationMessages(payload);
+  const conversation = getConversationContext(conversationMessages);
+  const message = getLatestUserMessage([...conversationMessages]);
   if (!message) {
     sendJson(res, 400, {
       error: 'EMPTY_MESSAGE',
@@ -228,25 +278,72 @@ async function handleChat(req, res) {
   try {
     const response = await ai.models.generateContent({
       model: MODEL,
-      contents: message,
+      contents: buildSqlUserPrompt({
+        conversation,
+        latestQuestion: message,
+      }),
       config: {
         systemInstruction: SQL_SYSTEM_PROMPT,
+        thinkingConfig: {
+          thinkingLevel: SQL_THINKING_LEVEL,
+        },
       },
     });
 
-    const sql = parseSqlResponse(response.text || '');
-    if (!sql) {
+    console.log('Gemini action response:', response.text || '');
+    const action = parseActionResponse(response.text || '');
+    const { sql, filter } = action;
+    if (!sql && !filter) {
       sendJson(res, 200, {
         reply: 'I can answer questions about the data center dataset. Try asking something like "How many data centers are there in Illinois?"',
       });
       return;
     }
 
+    if (!sql) {
+      sendJson(res, 200, {
+        reply: action.message || 'I updated the dashboard filters.',
+        filter,
+      });
+      return;
+    }
+
     const validSql = validateSql(sql);
     const rows = dataCenters.db.prepare(validSql).all();
+    const notes = getSparseNotes(validSql);
+    const result = buildResult(validSql, rows, notes);
+
+    if (isRateLimited()) {
+      sendJson(res, 200, {
+        reply: 'I generated the SQL and results, but ran out of Gemini requests before summarizing. Open the SQL/results panel to inspect the table.',
+        result,
+        filter,
+      });
+      return;
+    }
+
+    let reply;
+    try {
+      reply = await summarizeResult({
+        conversation,
+        userQuestion: message,
+        sql: validSql,
+        rows,
+        notes,
+      });
+    } catch (summaryError) {
+      if (isGeminiRateLimit(summaryError)) {
+        reply = 'I generated the SQL and results, but ran out of Gemini requests before summarizing. Open the SQL/results panel to inspect the table.';
+      } else {
+        console.error('Gemini summary request failed:', summaryError);
+        reply = 'I generated the SQL and results, but had trouble summarizing them. Open the SQL/results panel to inspect the table.';
+      }
+    }
 
     sendJson(res, 200, {
-      reply: formatSqlReply(validSql, rows),
+      reply,
+      result,
+      filter,
     });
   } catch (error) {
     if (isGeminiRateLimit(error)) {

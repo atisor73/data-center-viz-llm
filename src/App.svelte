@@ -3,8 +3,10 @@
   import Sidebar from './lib/Sidebar.svelte';
   import Filters from './lib/Filters.svelte';
   import ChatSidebar from './lib/ChatSidebar.svelte';
+  import SqlResultsPanel from './lib/SqlResultsPanel.svelte';
 
   let selectedCenter = $state(null);
+  let activeSqlResult = $state(null);
   let activeStatuses = $state(new Set(['Operating', 'Proposed', 'Approved/Permitted/Under construction', 'Expanding', 'Suspended', 'Cancelled']));
   let searchQuery = $state('');
   let totalCount = $state(0);
@@ -15,6 +17,11 @@
 
   function handleClose() {
     selectedCenter = null;
+  }
+
+  function handleApplyFilters(filter) {
+    searchQuery = filter.searchQuery || '';
+    activeStatuses = new Set(filter.activeStatuses);
   }
 </script>
 
@@ -38,7 +45,11 @@
       />
     </div>
 
-    <ChatSidebar />
+    <SqlResultsPanel result={activeSqlResult} onClose={() => activeSqlResult = null} />
+    <ChatSidebar
+      onShowResult={(result) => activeSqlResult = result}
+      onApplyFilters={handleApplyFilters}
+    />
   </div>
 </div>
 

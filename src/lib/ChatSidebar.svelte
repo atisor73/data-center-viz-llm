@@ -2,13 +2,15 @@
   import DOMPurify from 'dompurify';
   import { marked } from 'marked';
 
+  let { onShowResult = () => {}, onApplyFilters = () => {} } = $props();
+
   const historyLimit = 10;
   const minSidebarWidth = 280;
   const maxSidebarWidth = 720;
   const initialMessages = [
     {
       role: 'assistant',
-      text: 'Hi, ask me questions about the data center dataset. I can generate SQL and show the result table.',
+      text: 'Hi! Ask me anything about the data center dataset. I can help you explore the data with SQL queries, filter the dashboard by status, or search by keyword.',
     },
   ];
 
@@ -50,7 +52,11 @@
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages: nextMessages.slice(-historyLimit) }),
+        body: JSON.stringify({
+          messages: nextMessages
+            .slice(-historyLimit)
+            .map(({ role, text }) => ({ role, text })),
+        }),
       });
 
       const data = await response.json().catch(() => ({}));
@@ -59,7 +65,15 @@
         throw new Error(data.message || 'The chat service is unavailable. Please try again.');
       }
 
-      messages = [...messages, { role: 'assistant', text: data.reply || 'No response returned.' }];
+      if (data.filter) {
+        onApplyFilters(data.filter);
+      }
+
+      messages = [...messages, {
+        role: 'assistant',
+        text: data.reply || 'No response returned.',
+        result: data.result,
+      }];
     } catch (error) {
       messages = [...messages, { role: 'assistant', text: error.message }];
     } finally {
@@ -71,6 +85,7 @@
   function clearHistory() {
     messages = [...initialMessages];
     draft = '';
+    onShowResult(null);
   }
 
   function clampWidth(width) {
@@ -187,7 +202,7 @@
   <div class="chat-header">
     <div>
       <h2>Chat</h2>
-      <p>Gemini 3 Flash</p>
+      <p>Gemini 3.1 Flash Lite</p>
     </div>
     <div class="header-actions">
       <button class="clear-btn" onclick={clearHistory} disabled={sending}>Clear</button>
@@ -206,6 +221,11 @@
           <div class="markdown">
             {@html renderMarkdown(message.text)}
           </div>
+          {#if message.result}
+            <button class="result-btn" onclick={() => onShowResult(message.result)}>
+              View SQL and results
+            </button>
+          {/if}
         {:else}
           {message.text}
         {/if}
@@ -465,6 +485,22 @@
 
   .markdown :global(strong) {
     color: #f8fafc;
+  }
+
+  .result-btn {
+    background: #1e2535;
+    border: 1px solid #4a5568;
+    border-radius: 4px;
+    color: #90cdf4;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 8px;
+    padding: 5px 8px;
+  }
+
+  .result-btn:hover {
+    border-color: #63b3ed;
+    color: #bee3f8;
   }
 
   .chat-form {

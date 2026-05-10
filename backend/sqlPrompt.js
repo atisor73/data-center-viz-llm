@@ -75,6 +75,15 @@ South Dakota SD, Tennessee TN, Texas TX, Utah UT, Vermont VT, Virginia VA,
 Washington WA, West Virginia WV, Wisconsin WI, Wyoming WY.
 `;
 
+export const VALID_DASHBOARD_STATUSES = [
+  'Operating',
+  'Proposed',
+  'Approved/Permitted/Under construction',
+  'Expanding',
+  'Suspended',
+  'Cancelled',
+];
+
 export const EXAMPLE_VALUE_LIMIT = 8;
 
 export const LOW_CARDINALITY_COLUMNS = [
@@ -153,11 +162,15 @@ export function buildSqlPrompt({ rows, columns, derivedColumns, missingStats }) 
   const sparseLines = getSparseColumns(rows, columns, missingStats);
 
   return `
-You generate SQLite SELECT queries for a data center dataset.
-Return JSON only, in this exact shape: {"sql":"SELECT ..."}
-If the user's question is not about this dataset, return {"sql":null}.
+You generate SQLite SELECT queries and/or dashboard filters for a data center dataset.
+Return JSON only with these fields:
+{"sql":null,"filter":null,"message":null}
+The sql field must be a SELECT string or null.
+The filter field must be {"searchQuery":"text","activeStatuses":["status"]} or null.
+The message field must be a short user-facing message or null.
+If the user's request is not about this dataset or dashboard, return {"sql":null,"filter":null,"message":null}.
 
-Rules:
+SQL rules:
 - Use only the table data_centers.
 - Generate exactly one read-only SELECT query.
 - Do not use SELECT *. Select only the columns relevant to the user's question.
@@ -168,6 +181,20 @@ Rules:
 - Original CSV columns are stored as TEXT.
 - Numeric/date helper columns are derived from the original CSV values. Prefer these helper columns for numeric and date questions, but select the original text column too when showing reported values.
 - number_of_generators is not parsed because it mixes generator counts and power-capacity text.
+
+Dashboard filter rules:
+- The dashboard is an interactive map.
+- Use filter when the user asks to show, filter, display, narrow, or put results on the dashboard/map.
+- Use sql when the user asks a data question that needs an answer.
+- Use both sql and filter when the user asks to update the dashboard and answer a question.
+- When returning both, make sure the SQL answers the same subset shown by the dashboard filter.
+- searchQuery is the text for the existing dashboard search box.
+- For dashboard filters, use full state names like "California" instead of state abbreviations like "CA" when the user mentions a state.
+- For SQL, still use two-letter state abbreviations in the state column, such as state = 'CA'.
+- activeStatuses must use only these valid statuses: ${VALID_DASHBOARD_STATUSES.join(', ')}.
+- If the user does not mention a status for the dashboard filter, include all valid statuses.
+- The dashboard search box matches facility name, city, county, operator name, full state name, and state abbreviation.
+- Search examples: state name "Illinois", state abbreviation "IL", city "Ashburn", county "Loudoun", operator "Microsoft", facility name "Google Data Center".
 
 ${STATE_GUIDE}
 
@@ -188,5 +215,50 @@ ${messyExampleLines}
 
 Sparse columns with many missing values:
 ${sparseLines}
+`.trim();
+}
+
+export function buildSqlUserPrompt({ conversation, latestQuestion }) {
+  return `
+Use recent conversation for context.
+Generate SQL and/or dashboard filters only for the latest user question.
+Do not answer earlier questions again.
+Resolve follow-up references from the recent conversation when needed.
+If the latest question cannot be answered from the dataset or used to filter the dashboard, return {"sql":null,"filter":null,"message":null}.
+
+Recent conversation:
+${conversation || 'No previous conversation.'}
+
+Latest user question:
+${latestQuestion}
+`.trim();
+}
+
+export function buildSummaryPrompt({ conversation, userQuestion, sql, rows, notes, rowLimit }) {
+  const payload = {
+    recentConversation: conversation,
+    userQuestion,
+    sql,
+    columns: Object.keys(rows[0] || {}),
+    rows,
+    rowCountReturned: rows.length,
+    rowLimit,
+    notes,
+  };
+
+  return `
+Answer the user's question using only the SQL result below.
+The app is an interactive map dashboard.
+The latest user request may include both a dashboard filter command and a data question; focus your answer on the data question only.
+Use recent conversation for context.
+Use the SQL result as the source of truth.
+Do not invent facts outside the returned rows.
+If recent conversation conflicts with the SQL result, the SQL result wins.
+If the result is empty, say that no matching rows were returned.
+If notes mention missing values, include that limitation briefly when relevant.
+If rowCountReturned equals rowLimit, mention that the displayed result is limited to ${rowLimit} rows when that affects the answer.
+Keep the answer concise and do not include the SQL query or Markdown tables.
+
+${JSON.stringify(payload, null, 2)}
 `.trim();
 }

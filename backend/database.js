@@ -19,6 +19,11 @@ const DERIVED_COLUMNS = [
   { name: 'number_of_buildings_max', type: 'REAL' },
 ];
 
+const UNKNOWN_AS_MISSING_COLUMNS = new Set([
+  'community_pushback',
+  'sizerank',
+]);
+
 export const DERIVED_TO_SOURCE_COLUMN = {
   lat_num: 'lat',
   long_num: 'long',
@@ -38,6 +43,16 @@ export const DERIVED_TO_SOURCE_COLUMN = {
 
 function quoteIdentifier(identifier) {
   return `"${identifier.replaceAll('"', '""')}"`;
+}
+
+function normalizeOriginalValue(column, value) {
+  const text = String(value || '').trim();
+
+  if (UNKNOWN_AS_MISSING_COLUMNS.has(column) && text.toLowerCase() === 'unknown') {
+    return null;
+  }
+
+  return text || null;
 }
 
 function parseFloatValue(value) {
@@ -160,6 +175,9 @@ export function loadDataCenters(dataPath) {
   const csv = readFileSync(dataPath, 'utf8');
   const rows = csvParse(csv);
   const columns = rows.columns;
+  const normalizedRows = rows.map((row) => Object.fromEntries(
+    columns.map((column) => [column, normalizeOriginalValue(column, row[column])]),
+  ));
   const derivedColumnNames = DERIVED_COLUMNS.map((column) => column.name);
   const allColumns = [...columns, ...derivedColumnNames];
   const db = new DatabaseSync(':memory:');
@@ -174,19 +192,19 @@ export function loadDataCenters(dataPath) {
     `INSERT INTO data_centers (${allColumns.map(quoteIdentifier).join(', ')}) VALUES (${placeholders})`,
   );
 
-  for (const row of rows) {
+  for (const row of normalizedRows) {
     const derivedValues = getDerivedValues(row);
     insert.run(
-      ...columns.map((column) => row[column] || ''),
+      ...columns.map((column) => row[column]),
       ...derivedColumnNames.map((column) => derivedValues[column]),
     );
   }
 
   return {
     db,
-    rows,
+    rows: normalizedRows,
     columns,
     derivedColumns: DERIVED_COLUMNS,
-    missingStats: getMissingStats(rows, columns),
+    missingStats: getMissingStats(normalizedRows, columns),
   };
 }
