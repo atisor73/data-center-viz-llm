@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "server": "node backend/server.js",
+    "test": "echo \"No default tests. Run npm run test:chatbot for live chatbot tests.\"",
+    "test:chatbot": "node --test tests/chatbot.test.js",
     "build": "vite build",
     "preview": "vite preview"
   },

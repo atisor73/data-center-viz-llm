@@ -26,6 +26,14 @@ npm run server
 npm run dev
 ```
 
+## Chatbot Test
+
+The live chatbot test calls Gemini and uses your API quota. Run it in a separate terminal.
+
+```bash
+npm run test:chatbot
+```
+
 ## Secret Scanning
 
 This project uses `pre-commit` with Gitleaks to help prevent API keys and other secrets from being committed.
