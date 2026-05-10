@@ -8,6 +8,8 @@ Install the Node dependencies:
 npm install
 ```
 
+Use Node 24 or newer. The backend uses Node's built-in SQLite support for the data chat feature.
+
 Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey), then create a local `.env` file in the project root:
 
 ```env

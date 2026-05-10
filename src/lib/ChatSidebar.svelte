@@ -8,14 +8,8 @@
   const initialMessages = [
     {
       role: 'assistant',
-      text: 'Hi, I can answer general questions for now. Data-aware answers come next.',
+      text: 'Hi, ask me questions about the data center dataset. I can generate SQL and show the result table.',
     },
-  ];
-
-  const suggestedQuestions = [
-    'Which states have the most proposed data centers?',
-    'What are some questions I can ask about this map?',
-    'Explain why data centers matter for communities.',
   ];
 
   let open = $state(false);
@@ -23,14 +17,14 @@
   let sending = $state(false);
   let listening = $state(false);
   let resizing = $state(false);
-  let sidebarWidth = $state(340);
+  let sidebarWidth = $state(400);
   let messages = $state([...initialMessages]);
   let messagesEl;
   let inputEl;
   let recognition;
   let voiceBaseDraft = '';
   let startX = 0;
-  let startWidth = 340;
+  let startWidth = 400;
 
   $effect(() => {
     messages.length;
@@ -205,12 +199,6 @@
     </div>
   </div>
 
-  <div class="suggestions">
-    {#each suggestedQuestions as question}
-      <button onclick={() => sendMessage(question)} disabled={sending}>{question}</button>
-    {/each}
-  </div>
-
   <div class="messages" bind:this={messagesEl}>
     {#each messages as message}
       <div class="message" class:user={message.role === 'user'} class:assistant={message.role === 'assistant'}>
@@ -233,7 +221,7 @@
       bind:this={inputEl}
       bind:value={draft}
       onkeydown={handleKeydown}
-      placeholder="Ask a question..."
+      placeholder="How many data centers are there in Illinois?"
       rows="2"
       disabled={sending}
     ></textarea>
@@ -323,23 +311,6 @@
     z-index: 3;
   }
 
-  .resize-handle::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 3px;
-    bottom: 0;
-    width: 2px;
-    background: transparent;
-    transition: background 0.15s ease;
-  }
-
-  .resize-handle:hover::after,
-  .resize-handle:focus-visible::after,
-  .chat-sidebar.resizing .resize-handle::after {
-    background: #4a90d9;
-  }
-
   .chat-header {
     display: flex;
     align-items: flex-start;
@@ -404,39 +375,6 @@
   .clear-btn:disabled {
     cursor: wait;
     opacity: 0.5;
-  }
-
-  .suggestions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 16px;
-    border-bottom: 1px solid #2d3748;
-  }
-
-  .suggestions button {
-    background: #1e2535;
-    border: 1px solid #2d3748;
-    border-radius: 6px;
-    color: #cbd5e1;
-    cursor: pointer;
-    font-size: 12px;
-    line-height: 1.35;
-    overflow-wrap: anywhere;
-    padding: 8px 10px;
-    text-align: left;
-    white-space: normal;
-  }
-
-  .suggestions button:hover:not(:disabled) {
-    border-color: #4a5568;
-    background: #252d40;
-    color: #e2e8f0;
-  }
-
-  .suggestions button:disabled {
-    cursor: wait;
-    opacity: 0.55;
   }
 
   .messages {
