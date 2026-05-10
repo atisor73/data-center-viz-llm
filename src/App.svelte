@@ -2,6 +2,7 @@
   import Map from './lib/Map.svelte';
   import Sidebar from './lib/Sidebar.svelte';
   import Filters from './lib/Filters.svelte';
+  import ChatSidebar from './lib/ChatSidebar.svelte';
 
   let selectedCenter = $state(null);
   let activeStatuses = $state(new Set(['Operating', 'Proposed', 'Approved/Permitted/Under construction', 'Expanding', 'Suspended', 'Cancelled']));
@@ -24,6 +25,8 @@
   </header>
 
   <div class="layout">
+    <Sidebar center={selectedCenter} onClose={handleClose} />
+
     <div class="map-panel">
       <Filters bind:activeStatuses bind:searchQuery />
       <Map
@@ -35,7 +38,7 @@
       />
     </div>
 
-    <Sidebar center={selectedCenter} onClose={handleClose} />
+    <ChatSidebar />
   </div>
 </div>
 
@@ -90,6 +93,7 @@
 
   .map-panel {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     position: relative;

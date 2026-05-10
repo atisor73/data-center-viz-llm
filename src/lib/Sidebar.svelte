@@ -215,7 +215,7 @@
     width: 0;
     overflow: hidden;
     background: #1a1f2e;
-    border-left: 1px solid #2d3748;
+    border-right: 1px solid #2d3748;
     display: flex;
     flex-direction: column;
     transition: width 0.25s ease;
