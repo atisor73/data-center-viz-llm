@@ -6,10 +6,11 @@ const PORT = Number(process.env.PORT || 3001);
 const MODEL = 'gemini-3-flash-preview';
 const RATE_LIMIT = Number(process.env.CHAT_RPM_LIMIT || 5);
 const WINDOW_MS = 60_000;
+const MAX_MESSAGES = 10;
 const RATE_LIMIT_MESSAGE = 'We ran out of Gemini requests. Please wait one minute and try again.';
 
-const ai = process.env.GEMINI_API_KEY
-  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+const ai = process.env.GOOGLE_API_KEY
+  ? new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY })
   : null;
 
 let requestTimes = [];
@@ -42,6 +43,24 @@ function isGeminiRateLimit(error) {
     message.toLowerCase().includes('rate limit');
 }
 
+function cleanMessages(payload) {
+  const rawMessages = Array.isArray(payload.messages)
+    ? payload.messages
+    : [{ role: 'user', text: payload.message }];
+
+  return rawMessages
+    .slice(-MAX_MESSAGES)
+    .map((message) => ({
+      role: message?.role === 'assistant' ? 'model' : 'user',
+      text: typeof message?.text === 'string' ? message.text.trim() : '',
+    }))
+    .filter((message) => message.text)
+    .map((message) => ({
+      role: message.role,
+      parts: [{ text: message.text }],
+    }));
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -63,7 +82,7 @@ async function handleChat(req, res) {
   if (!ai) {
     sendJson(res, 500, {
       error: 'MISSING_API_KEY',
-      message: 'Missing GEMINI_API_KEY. Add it to your .env file and restart the server.',
+      message: 'Missing GOOGLE_API_KEY. Add it to your .env file and restart the server.',
     });
     return;
   }
@@ -79,8 +98,8 @@ async function handleChat(req, res) {
     return;
   }
 
-  const message = typeof payload.message === 'string' ? payload.message.trim() : '';
-  if (!message) {
+  const contents = cleanMessages(payload);
+  if (!contents.length) {
     sendJson(res, 400, {
       error: 'EMPTY_MESSAGE',
       message: 'Please enter a message before sending.',
@@ -99,7 +118,7 @@ async function handleChat(req, res) {
   try {
     const response = await ai.models.generateContent({
       model: MODEL,
-      contents: message,
+      contents,
     });
 
     sendJson(res, 200, {
@@ -135,8 +154,8 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('GEMINI_API_KEY is not set. Chat requests will fail until it is added to .env.');
+  if (!process.env.GOOGLE_API_KEY) {
+    console.warn('GOOGLE_API_KEY is not set. Chat requests will fail until it is added to .env.');
   }
   console.log(`Chat server listening on http://localhost:${PORT}`);
 });

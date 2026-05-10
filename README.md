@@ -11,7 +11,7 @@ npm install
 Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey), then create a local `.env` file in the project root:
 
 ```env
-GEMINI_API_KEY=your_api_key_here
+GOOGLE_API_KEY=your_api_key_here
 ```
 
 Run the backend and frontend in two terminals:
