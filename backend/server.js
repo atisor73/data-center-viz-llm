@@ -6,9 +6,8 @@ import 'dotenv/config';
 
 const PORT = Number(process.env.PORT || 3001);
 const MODEL = 'gemini-3.1-flash-lite';
-const SQL_THINKING_LEVEL = 'medium';
-const SUMMARY_THINKING_LEVEL = 'low';
-const RATE_LIMIT = Number(process.env.CHAT_RPM_LIMIT || 5);
+const SQL_THINKING_LEVEL = 'minimal';
+const SUMMARY_THINKING_LEVEL = 'minimal';
 const RESULT_LIMIT = 50;
 const DATA_PATH = new URL('../public/data_centers.csv', import.meta.url);
 
@@ -65,7 +64,6 @@ async function handleChat(req, res) {
       model: MODEL,
       dataCenters,
       messages: getMessages(payload),
-      rateLimit: RATE_LIMIT,
       resultLimit: RESULT_LIMIT,
       sqlThinkingLevel: SQL_THINKING_LEVEL,
       summaryThinkingLevel: SUMMARY_THINKING_LEVEL,

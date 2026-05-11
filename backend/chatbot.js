@@ -6,13 +6,8 @@ import {
   buildSummaryPrompt,
 } from './sqlPrompt.js';
 
-const WINDOW_MS = 60_000;
 const MAX_MESSAGES = 10;
 const SPARSE_MISSING_RATIO = 0.5;
-const RATE_LIMIT_MESSAGE = 'We ran out of Gemini requests. Please wait one minute and try again.';
-const VALID_STATUS_SET = new Set(VALID_DASHBOARD_STATUSES);
-
-let requestTimes = [];
 
 export class ChatbotError extends Error {
   constructor(code, message, status = 500) {
@@ -30,18 +25,6 @@ export function isGeminiRateLimit(error) {
     message.includes('429') ||
     message.includes('RESOURCE_EXHAUSTED') ||
     message.toLowerCase().includes('rate limit');
-}
-
-function isRateLimited(rateLimit) {
-  const now = Date.now();
-  requestTimes = requestTimes.filter((time) => now - time < WINDOW_MS);
-
-  if (requestTimes.length >= rateLimit) {
-    return true;
-  }
-
-  requestTimes.push(now);
-  return false;
 }
 
 function cleanConversationMessages(messages) {
@@ -80,7 +63,7 @@ function validateDashboardFilter(filter) {
     ? filter.searchQuery.trim()
     : '';
   const activeStatuses = Array.isArray(filter.activeStatuses)
-    ? filter.activeStatuses.filter((status) => VALID_STATUS_SET.has(status))
+    ? filter.activeStatuses.filter((status) => VALID_DASHBOARD_STATUSES.includes(status))
     : [];
 
   return {
@@ -96,7 +79,14 @@ function parseActionResponse(text) {
     .replace(/```$/i, '')
     .trim();
 
-  const parsed = JSON.parse(cleaned);
+  // If the response is not valid JSON, return nulls
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    return { sql: null, filter: null, message: null };
+  }
+
   const sql = typeof parsed.sql === 'string' ? parsed.sql.trim() : null;
   const message = typeof parsed.message === 'string' ? parsed.message.trim() : null;
 
@@ -189,16 +179,19 @@ async function summarizeResult({
   resultLimit,
   summaryThinkingLevel,
 }) {
+  const summaryPrompt = buildSummaryPrompt({
+    conversation,
+    userQuestion,
+    sql,
+    rows,
+    notes,
+    rowLimit: resultLimit,
+  });
+
+  // console.log('Gemini summary prompt:', summaryPrompt);
   const response = await ai.models.generateContent({
     model,
-    contents: buildSummaryPrompt({
-      conversation,
-      userQuestion,
-      sql,
-      rows,
-      notes,
-      rowLimit: resultLimit,
-    }),
+    contents: summaryPrompt,
     config: {
       thinkingConfig: {
         thinkingLevel: summaryThinkingLevel,
@@ -215,7 +208,6 @@ export async function runChatbotTurn({
   model,
   dataCenters,
   messages,
-  rateLimit,
   resultLimit,
   sqlThinkingLevel,
   summaryThinkingLevel,
@@ -235,18 +227,19 @@ export async function runChatbotTurn({
     throw new ChatbotError('EMPTY_MESSAGE', 'Please enter a message before sending.', 400);
   }
 
-  if (isRateLimited(rateLimit)) {
-    throw new ChatbotError('RATE_LIMIT', RATE_LIMIT_MESSAGE, 429);
-  }
+  const systemPrompt = buildSqlPrompt(dataCenters);
+  const userPrompt = buildSqlUserPrompt({
+    conversation,
+    latestQuestion: message,
+  });
 
+  // console.log('Gemini action system prompt:', systemPrompt);
+  // console.log('Gemini action user prompt:', userPrompt);
   const response = await ai.models.generateContent({
     model,
-    contents: buildSqlUserPrompt({
-      conversation,
-      latestQuestion: message,
-    }),
+    contents: userPrompt,
     config: {
-      systemInstruction: buildSqlPrompt(dataCenters),
+      systemInstruction: systemPrompt,
       thinkingConfig: {
         thinkingLevel: sqlThinkingLevel,
       },
@@ -274,14 +267,6 @@ export async function runChatbotTurn({
   const rows = dataCenters.db.prepare(validSql).all();
   const notes = getSparseNotes(validSql, dataCenters);
   const result = buildResult(validSql, rows, notes, resultLimit);
-
-  if (isRateLimited(rateLimit)) {
-    return {
-      reply: 'I generated the SQL and results, but ran out of Gemini requests before summarizing. Open the SQL/results panel to inspect the table.',
-      result,
-      filter,
-    };
-  }
 
   let reply;
   try {

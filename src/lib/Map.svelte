@@ -35,6 +35,15 @@
     'Unknown':                               '#a0aec0',
   };
 
+  const SEARCH_FIELDS = [
+    'facility_name',
+    'city',
+    'operator_name',
+    'tenant',
+    'purpose',
+    'county',
+  ];
+
   let container;
   let allData = $state([]);
   let tooltip = $state({ visible: false, x: 0, y: 0, center: null });
@@ -51,12 +60,9 @@
         const stateAbbrev = (d.state || '').toLowerCase();
         const stateFull = STATE_NAMES[d.state] || '';
         return (
-          (d.facility_name || '').toLowerCase().includes(q) ||
-          (d.city || '').toLowerCase().includes(q) ||
+          SEARCH_FIELDS.some(field => (d[field] || '').toLowerCase().includes(q)) ||
           stateAbbrev === q ||
-          stateFull.includes(q) ||
-          (d.operator_name || '').toLowerCase().includes(q) ||
-          (d.county || '').toLowerCase().includes(q)
+          stateFull.includes(q)
         );
       }
       return true;

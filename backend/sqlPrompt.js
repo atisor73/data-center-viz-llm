@@ -84,7 +84,7 @@ export const VALID_DASHBOARD_STATUSES = [
   'Cancelled',
 ];
 
-export const EXAMPLE_VALUE_LIMIT = 8;
+export const EXAMPLE_VALUE_LIMIT = 10;
 
 export const LOW_CARDINALITY_COLUMNS = [
   'status',
@@ -193,8 +193,8 @@ Dashboard filter rules:
 - For SQL, still use two-letter state abbreviations in the state column, such as state = 'CA'.
 - activeStatuses must use only these valid statuses: ${VALID_DASHBOARD_STATUSES.join(', ')}.
 - If the user does not mention a status for the dashboard filter, include all valid statuses.
-- The dashboard search box matches facility name, city, county, operator name, full state name, and state abbreviation.
-- Search examples: state name "Illinois", state abbreviation "IL", city "Ashburn", county "Loudoun", operator "Microsoft", facility name "Google Data Center".
+- The dashboard search box matches facility name, city, county, operator name, tenant, purpose, full state name, and state abbreviation.
+- Search examples: state name "Illinois", state abbreviation "IL", city "Ashburn", county "Loudoun", operator "Microsoft", tenant "Google", purpose "AI", facility name "Google Data Center".
 
 ${STATE_GUIDE}
 

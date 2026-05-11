@@ -27,7 +27,6 @@ test('How many data centers are there in Illinois?', async () => {
     messages: [
       { role: 'user', text: 'How many data centers are there in Illinois?' },
     ],
-    rateLimit: 15,
     resultLimit: 50,
     sqlThinkingLevel: 'medium',
     summaryThinkingLevel: 'low',
@@ -47,7 +46,6 @@ test('Show proposed data centers in California on the map.', async () => {
     messages: [
       { role: 'user', text: 'Show proposed data centers in California on the map.' },
     ],
-    rateLimit: 15,
     resultLimit: 50,
     sqlThinkingLevel: 'medium',
     summaryThinkingLevel: 'low',
@@ -67,7 +65,6 @@ test('Filter the dashboard to California and count how many data centers are the
     messages: [
       { role: 'user', text: 'Filter the dashboard to California and count how many data centers are there.' },
     ],
-    rateLimit: 15,
     resultLimit: 50,
     sqlThinkingLevel: 'medium',
     summaryThinkingLevel: 'low',
@@ -89,7 +86,6 @@ test('Explain the central limit theorem.', async () => {
     messages: [
       { role: 'user', text: 'Explain the central limit theorem.' },
     ],
-    rateLimit: 15,
     resultLimit: 50,
     sqlThinkingLevel: 'medium',
     summaryThinkingLevel: 'low',
