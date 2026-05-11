@@ -5,6 +5,7 @@
 
   let selectedCenter = $state(null);
   let activeStatuses = $state(new Set(['Operating', 'Proposed', 'Approved/Permitted/Under construction', 'Expanding', 'Suspended', 'Cancelled']));
+  let activeBWSLabels = $state(new Set(['Low (<10%)', 'Low - Medium (10-20%)', 'Medium - High (20-40%)', 'High (40-80%)', 'Extremely High (>80%)', 'Arid and Low Water Use']));
   let searchQuery = $state('');
   let totalCount = $state(0);
 
@@ -25,10 +26,11 @@
 
   <div class="layout">
     <div class="map-panel">
-      <Filters bind:activeStatuses bind:searchQuery />
+      <Filters bind:activeStatuses bind:searchQuery bind:activeBWSLabels/>
       <Map
         {activeStatuses}
         {searchQuery}
+        {activeBWSLabels}
         {selectedCenter}
         onSelect={handleSelect}
         bind:visibleCount={totalCount}
