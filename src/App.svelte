@@ -5,6 +5,7 @@
   import ChatSidebar from './lib/ChatSidebar.svelte';
   import InfoPanel from './lib/InfoPanel.svelte';
   import SqlResultsPanel from './lib/SqlResultsPanel.svelte';
+  import WaterStressSummary from './lib/WaterStressSummary.svelte';
 
   let selectedCenter = $state(null);
   let activeSqlResult = $state(null);
@@ -59,6 +60,7 @@
         onSelect={handleSelect}
         bind:visibleCount={totalCount}
       />
+      <WaterStressSummary />
     </div>
 
     <SqlResultsPanel result={activeSqlResult} onClose={() => activeSqlResult = null} />
