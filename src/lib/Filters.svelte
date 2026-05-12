@@ -1,5 +1,5 @@
 <script>
-  let { activeStatuses = $bindable(), searchQuery = $bindable() } = $props();
+  let { activeStatuses = $bindable(), searchQuery = $bindable(), activeBWSLabels = $bindable() } = $props();
 
   const STATUS_CONFIG = [
     { key: 'Operating',                              label: 'Operating',            color: '#48bb78' },
@@ -8,6 +8,15 @@
     { key: 'Expanding',                              label: 'Expanding',            color: '#9f7aea' },
     { key: 'Suspended',                              label: 'Suspended',            color: '#718096' },
     { key: 'Cancelled',                              label: 'Cancelled',            color: '#fc8181' },
+  ];
+
+  const BWS_CONFIG = [
+    { key: 'Low (<10%)', label: 'Low', color: '#f2d65a' },
+    { key: 'Low - Medium (10-20%)', label: 'Low–Medium', color: '#edaa4c' },
+    { key: 'Medium - High (20-40%)', label: 'Medium–High', color: '#bd5826' },
+    { key: 'High (40-80%)', label: 'High', color: '#e31414' },
+    { key: 'Extremely High (>80%)', label: 'Extremely High', color: '#610606' },
+    { key: 'Arid and Low Water Use', label: 'Arid and Low Water Use', color: '#718096' }
   ];
 
   function toggle(key) {
@@ -27,6 +36,22 @@
       activeStatuses = new Set(STATUS_CONFIG.map(s => s.key));
     }
   }
+
+  function toggleBWS(key) {
+    const next = new Set(activeBWSLabels);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    activeBWSLabels = next;
+  }
+
+  function toggleAllBWS() {
+    if (activeBWSLabels.size === BWS_CONFIG.length) {
+      activeBWSLabels = new Set();
+    } else {
+      activeBWSLabels = new Set(BWS_CONFIG.map(s => s.key));
+    }
+  }
+
 </script>
 
 <div class="filters">
@@ -60,6 +85,24 @@
         {s.label}
       </button>
     {/each}
+    </div>
+
+    <div class="legend bws-legend">
+      <button class="toggle-all" onclick={toggleAllBWS}>
+        {activeBWSLabels.size === BWS_CONFIG.length ? 'Hide all' : 'Show all'}
+      </button>
+
+      {#each BWS_CONFIG as s}
+        <button
+          class="chip"
+          class:inactive={!activeBWSLabels.has(s.key)}
+          onclick={() => toggleBWS(s.key)}
+          style="--dot: {s.color}"
+        >
+          <span class="dot"></span>
+          {s.label}
+        </button>
+      {/each}
   </div>
 </div>
 

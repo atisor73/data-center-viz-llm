@@ -6,6 +6,7 @@
   let {
     activeStatuses,
     searchQuery,
+    activeBWSLabels,
     selectedCenter,
     onSelect,
     visibleCount = $bindable(0),
@@ -50,10 +51,13 @@
 
   let dotsGroup = null;
   let projection = null;
+  let spatialLayer = null;
+  let spatialBWSGeojson = null;
   let currentZoom = 1;
 
   let filteredData = $derived(
     allData.filter(d => {
+      console.log(d)
       if (!activeStatuses.has(d.status)) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase().trim();
@@ -80,13 +84,19 @@
     }
   });
 
+  $effect(() => {
+    const labels = [...activeBWSLabels];
+    redrawPolygons();
+  });
+
   onMount(async () => {
-    const [csvText, usAtlas] = await Promise.all([
+    const [csvText, usAtlas, spatialGeojson] = await Promise.all([
       fetch('/data_centers.csv').then(r => r.text()),
       fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json').then(r => r.json()),
+      fetch('/wri_usa.geojson').then(r => r.json()),
     ]);
 
-    buildMap(usAtlas);
+    buildMap(usAtlas, spatialGeojson);
 
     allData = d3.csvParse(csvText).filter(d => {
       const lat = parseFloat(d.lat);
@@ -111,9 +121,10 @@
     }
   }
 
-  function buildMap(usAtlas) {
+  function buildMap(usAtlas, spatialGeojson) {
     const W = container.clientWidth;
     const H = container.clientHeight;
+    spatialBWSGeojson = spatialGeojson;
 
     projection = d3.geoAlbersUsa()
       .translate([W / 2, H / 2])
@@ -150,6 +161,11 @@
       .attr('stroke', '#2d3748')
       .attr('stroke-width', 0.5);
 
+    // Spatial polygons
+    spatialLayer = g.append('g')
+      .attr('class', 'spatial-layer');
+    redrawPolygons();
+    
     // State borders
     g.append('path')
       .datum(topojson.mesh(usAtlas, usAtlas.objects.states, (a, b) => a !== b))
@@ -206,22 +222,116 @@
         onSelect(d);
       });
   }
+
+  function redrawPolygons() {
+    if (!spatialLayer || !spatialBWSGeojson) return;
+
+    const filtered = spatialBWSGeojson.features.filter(d =>
+      activeBWSLabels.has(d.properties.bws_label)
+    );
+
+    const path = d3.geoPath().projection(projection);
+
+    const polygons = spatialLayer
+      .selectAll('path')
+      .data(filtered, d => d.properties.id || d.properties.bws_label);
+
+    polygons.exit().remove();
+
+    const enter = polygons.enter()
+      .append('path')
+      .attr('d', path)
+      .attr('opacity', 0.5)
+      .attr('stroke', 'none');
+
+    enter
+      .merge(polygons)
+      .attr('d', path)
+      .attr('fill', d => {
+        const label = d.properties.bws_label;
+
+        if (label === 'Low (<10%)') return '#edd09f';
+        if (label === 'Low - Medium (10-20%)') return '#edaa4c';
+        if (label === 'Medium - High (20-40%)') return '#bd5826';
+        if (label === 'High (40-80%)') return '#e31414';
+        if (label === 'Extremely High (>80%)') return '#610606';
+
+        return '#718096';
+      })
+      .attr('opacity', 0.5)
+      .on('mouseenter', (event, d) => {
+
+        d3.select(event.currentTarget)
+          .raise()
+          .attr('opacity', 0.8)
+          .attr('stroke', '#ffffff')
+          .attr('stroke-width', 0.8);
+
+        tooltip = {
+          visible: true,
+          polygon: {
+            bws_label: d.properties.bws_label,
+            bws_score: d.properties.bws_score.toFixed(2)
+          },
+          x: event.clientX + 14,
+          y: event.clientY - 10
+        };
+      })
+      .on('mousemove', event => {
+        tooltip = {
+          ...tooltip,
+          x: event.clientX + 14,
+          y: event.clientY - 10
+        };
+      })
+
+      .on('mouseleave', (event) => {
+        d3.select(event.currentTarget)
+          .attr('opacity', 0.5)
+          .attr('stroke', 'none');
+
+        tooltip = { ...tooltip, visible: false };
+      });
+  }
+
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="map-container" bind:this={container} onclick={() => onSelect(null)}></div>
 
-{#if tooltip.visible && tooltip.center}
-  <div class="tooltip" style="left:{tooltip.x}px;top:{tooltip.y}px">
-    <div class="tt-name">{tooltip.center.facility_name || 'Unknown'}</div>
-    <div class="tt-loc">{[tooltip.center.city, tooltip.center.state].filter(Boolean).join(', ')}</div>
-    <div class="tt-status" style="color:{STATUS_COLOR[tooltip.center.status] || '#a0aec0'}">
-      {tooltip.center.status}
+{#if tooltip.visible}
+
+  <!-- Data center tooltip -->
+  {#if tooltip.center}
+    <div class="tooltip" style="left:{tooltip.x}px;top:{tooltip.y}px">
+      <div class="tt-name">{tooltip.center.facility_name || 'Unknown'}</div>
+      <div class="tt-loc">{[tooltip.center.city, tooltip.center.state].filter(Boolean).join(', ')}</div>
+      <div class="tt-status" style="color:{STATUS_COLOR[tooltip.center.status] || '#a0aec0'}">
+        {tooltip.center.status}
+      </div>
+      {#if tooltip.center.mw && tooltip.center.mw !== 'Unknown'}
+        <div class="tt-mw">{tooltip.center.mw} MW</div>
+      {/if}
     </div>
-    {#if tooltip.center.mw && tooltip.center.mw !== 'Unknown'}
-      <div class="tt-mw">{tooltip.center.mw} MW</div>
-    {/if}
-  </div>
+  {/if}
+
+  <!-- Polygon tooltip -->
+  {#if tooltip.polygon}
+    <div class="tooltip" style="left:{tooltip.x}px;top:{tooltip.y}px">
+      <div class="tt-name">
+        Baseline Annual Water Stress
+      </div>
+
+      <div class="tt-status">
+        {tooltip.polygon.bws_label}
+      </div>
+
+      <div class="tt-mw">
+        Score: {tooltip.polygon.bws_score}
+      </div>
+    </div>
+  {/if}
+
 {/if}
 
 <style>
