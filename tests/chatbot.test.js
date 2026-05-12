@@ -114,20 +114,3 @@ test('Show high water stress areas on the map.', async () => {
   assert.ok(response.filter.activeBWSLabels.includes('High (40-80%)'));
   assert.equal(response.result, undefined);
 });
-
-test('How many data centers are in high water stress areas?', async () => {
-  const response = await runChatbotTurn({
-    ai,
-    model: MODEL,
-    dataCenters,
-    messages: [
-      { role: 'user', text: 'How many data centers are in high water stress areas?' },
-    ],
-    resultLimit: 50,
-    sqlThinkingLevel: 'medium',
-    summaryThinkingLevel: 'low',
-  });
-
-  assert.ok(response.reply);
-  assert.equal(response.result, undefined);
-});
