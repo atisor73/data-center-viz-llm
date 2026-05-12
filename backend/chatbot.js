@@ -1,5 +1,6 @@
 import { DERIVED_TO_SOURCE_COLUMN } from './database.js';
 import {
+  VALID_BWS_LABELS,
   VALID_DASHBOARD_STATUSES,
   buildSqlPrompt,
   buildSqlUserPrompt,
@@ -59,17 +60,29 @@ function validateDashboardFilter(filter) {
     return null;
   }
 
-  const searchQuery = typeof filter.searchQuery === 'string'
-    ? filter.searchQuery.trim()
-    : '';
-  const activeStatuses = Array.isArray(filter.activeStatuses)
-    ? filter.activeStatuses.filter((status) => VALID_DASHBOARD_STATUSES.includes(status))
-    : [];
+  const nextFilter = {};
 
-  return {
-    searchQuery,
-    activeStatuses: activeStatuses.length ? activeStatuses : VALID_DASHBOARD_STATUSES,
-  };
+  if (typeof filter.searchQuery === 'string') {
+    nextFilter.searchQuery = filter.searchQuery.trim();
+  }
+
+  if (Array.isArray(filter.activeStatuses)) {
+    const activeStatuses = filter.activeStatuses
+      .filter((status) => VALID_DASHBOARD_STATUSES.includes(status));
+    if (activeStatuses.length) {
+      nextFilter.activeStatuses = activeStatuses;
+    }
+  }
+
+  if (Array.isArray(filter.activeBWSLabels)) {
+    const activeBWSLabels = filter.activeBWSLabels
+      .filter((label) => VALID_BWS_LABELS.includes(label));
+    if (activeBWSLabels.length) {
+      nextFilter.activeBWSLabels = activeBWSLabels;
+    }
+  }
+
+  return Object.keys(nextFilter).length ? nextFilter : null;
 }
 
 function parseActionResponse(text) {

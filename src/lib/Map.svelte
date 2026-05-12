@@ -57,7 +57,7 @@
 
   let filteredData = $derived(
     allData.filter(d => {
-      console.log(d)
+      // console.log(d);
       if (!activeStatuses.has(d.status)) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase().trim();

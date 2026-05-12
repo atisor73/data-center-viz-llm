@@ -5,10 +5,12 @@
   import ChatSidebar from './lib/ChatSidebar.svelte';
   import SqlResultsPanel from './lib/SqlResultsPanel.svelte';
 
+  const VALID_BWS_LABELS = ['Low (<10%)', 'Low - Medium (10-20%)', 'Medium - High (20-40%)', 'High (40-80%)', 'Extremely High (>80%)', 'Arid and Low Water Use'];
+
   let selectedCenter = $state(null);
   let activeSqlResult = $state(null);
   let activeStatuses = $state(new Set(['Operating', 'Proposed', 'Approved/Permitted/Under construction', 'Expanding', 'Suspended', 'Cancelled']));
-  let activeBWSLabels = $state(new Set(['Low (<10%)', 'Low - Medium (10-20%)', 'Medium - High (20-40%)', 'High (40-80%)', 'Extremely High (>80%)', 'Arid and Low Water Use']));
+  let activeBWSLabels = $state(new Set(VALID_BWS_LABELS));
   let searchQuery = $state('');
   let totalCount = $state(0);
 
@@ -21,8 +23,15 @@
   }
 
   function handleApplyFilters(filter) {
-    searchQuery = filter.searchQuery || '';
-    activeStatuses = new Set(filter.activeStatuses);
+    if ('searchQuery' in filter) {
+      searchQuery = filter.searchQuery || '';
+    }
+    if (filter.activeStatuses) {
+      activeStatuses = new Set(filter.activeStatuses);
+    }
+    if (filter.activeBWSLabels) {
+      activeBWSLabels = new Set(filter.activeBWSLabels);
+    }
   }
 </script>
 
@@ -36,7 +45,7 @@
     <Sidebar center={selectedCenter} onClose={handleClose} />
 
     <div class="map-panel">
-      <Filters bind:activeStatuses bind:searchQuery bind:activeBWSLabels/>
+      <Filters bind:activeStatuses bind:searchQuery bind:activeBWSLabels />
       <Map
         {activeStatuses}
         {searchQuery}
