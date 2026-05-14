@@ -32,7 +32,7 @@
   let matchedRows = $state(0);
   let totalRows = $state(0);
   let maxStateBucketCount = $state(0);
-  let collapsed = $state(false);
+  let collapsed = $state(true);
   let activeView = $state('snapshot');
   let tooltip = $state({
     visible: false,
