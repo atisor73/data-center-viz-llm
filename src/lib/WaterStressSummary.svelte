@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
+  import { withBase } from './paths.js';
 
   const BWS_CONFIG = [
     { key: 'Low (<10%)', label: 'Low', color: '#f2d65a' },
@@ -44,7 +45,7 @@
 
   onMount(async () => {
     try {
-      const csvText = await fetch('/data_centers_with_derived_columns.csv').then((response) => response.text());
+      const csvText = await fetch(withBase('/data_centers_with_derived_columns.csv')).then((response) => response.text());
       const rows = d3.csvParse(csvText);
       const matched = rows.filter((row) => SUPPORTED_LABELS.has(row.bws_label));
 

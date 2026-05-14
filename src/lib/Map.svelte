@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import * as d3 from 'd3';
   import * as topojson from 'topojson-client';
+  import { withBase } from './paths.js';
 
   let {
     activeStatuses,
@@ -91,9 +92,9 @@
 
   onMount(async () => {
     const [csvText, usAtlas, spatialGeojson] = await Promise.all([
-      fetch('/data_centers.csv').then(r => r.text()),
+      fetch(withBase('/data_centers.csv')).then(r => r.text()),
       fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json').then(r => r.json()),
-      fetch('/wri_usa.geojson').then(r => r.json()),
+      fetch(withBase('/wri_usa.geojson')).then(r => r.json()),
     ]);
 
     buildMap(usAtlas, spatialGeojson);

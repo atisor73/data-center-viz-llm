@@ -7,10 +7,15 @@
   const historyLimit = 10;
   const minSidebarWidth = 280;
   const maxSidebarWidth = 720;
+  const configuredChatApi = import.meta.env.VITE_CHAT_API_URL?.trim();
+  const chatApiUrl = configuredChatApi || (import.meta.env.DEV ? '/api/chat' : '');
+  const chatUnavailableMessage = 'Chat is unavailable in this static deployment. Set VITE_CHAT_API_URL to a hosted backend to re-enable it.';
   const initialMessages = [
     {
       role: 'assistant',
-      text: 'Hi! Ask me anything about the data center dataset. I can help you explore the data with SQL queries, filter the dashboard by status, or search by keyword.',
+      text: chatApiUrl
+        ? 'Hi! Ask me anything about the data center dataset. I can help you explore the data with SQL queries, filter the dashboard by status, or search by keyword.'
+        : chatUnavailableMessage,
     },
   ];
 
@@ -40,6 +45,10 @@
   async function sendMessage(text = draft) {
     const message = text.trim();
     if (!message || sending) return;
+    if (!chatApiUrl) {
+      messages = [...messages, { role: 'assistant', text: chatUnavailableMessage }];
+      return;
+    }
 
     const nextMessages = [...messages, { role: 'user', text: message }];
     messages = nextMessages;
@@ -47,7 +56,7 @@
     sending = true;
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(chatApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -243,12 +252,12 @@
       onkeydown={handleKeydown}
       placeholder="How many data centers are there in Illinois?"
       rows="2"
-      disabled={sending}
+      disabled={sending || !chatApiUrl}
     ></textarea>
     <button
       type="button"
       class:active={listening}
-      disabled={sending}
+      disabled={sending || !chatApiUrl}
       onclick={toggleVoiceInput}
       aria-label={listening ? 'Stop voice input' : 'Start voice input'}
       title={listening ? 'Stop voice input' : 'Start voice input'}
@@ -258,7 +267,7 @@
         <path d="M4.75 9.5a.75.75 0 0 1 1.5 0 3.75 3.75 0 0 0 7.5 0 .75.75 0 0 1 1.5 0 5.25 5.25 0 0 1-4.5 5.19v1.56h2a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1 0-1.5h2v-1.56A5.25 5.25 0 0 1 4.75 9.5Z" />
       </svg>
     </button>
-    <button type="submit" disabled={sending || !draft.trim()} aria-label="Send message">
+    <button type="submit" disabled={sending || !draft.trim() || !chatApiUrl} aria-label="Send message">
       <svg viewBox="0 0 20 20" fill="currentColor">
         <path d="M3.105 2.289a.75.75 0 0 1 .816-.114l13 6.5a.75.75 0 0 1 0 1.342l-13 6.5A.75.75 0 0 1 2.86 15.7l1.4-5.7-1.4-5.7a.75.75 0 0 1 .245-.811Zm2.49 8.461-.857 3.49L14.91 10 4.738 5.76l.857 3.49H10a.75.75 0 0 1 0 1.5H5.595Z" />
       </svg>

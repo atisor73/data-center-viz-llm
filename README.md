@@ -26,6 +26,22 @@ npm run server
 npm run dev
 ```
 
+## GitHub Pages
+
+This repo is set up to deploy the static frontend to GitHub Pages with GitHub Actions.
+
+- The workflow publishes the built `dist/` output whenever you push to `main`.
+- Frontend asset and dataset URLs are base-path aware, so they work under `/data-center-viz-llm/`.
+- The Node chat backend in `backend/` does not run on GitHub Pages. In the default Pages deploy, chat is shown as unavailable instead of failing.
+- If you later host the backend elsewhere, set `VITE_CHAT_API_URL` in the GitHub repository's Actions variables/secrets so the deployed frontend can call it.
+
+To enable Pages in GitHub:
+
+1. Push this repo to GitHub.
+2. In GitHub, open `Settings` -> `Pages`.
+3. Set `Source` to `GitHub Actions`.
+4. Push to `main` to trigger the deploy workflow.
+
 ## Chatbot Test
 
 The live chatbot test calls Gemini and uses your API quota. Run it in a separate terminal.
