@@ -32,6 +32,8 @@ jobs:
         run: npm ci
 
       - name: Build site
+        env:
+          VITE_CHAT_API_URL: https://data-center-viz-llm.onrender.com/api/chat
         run: npm run build
 
       - name: Configure Pages
