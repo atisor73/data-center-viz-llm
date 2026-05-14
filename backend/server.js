@@ -10,15 +10,34 @@ const SQL_THINKING_LEVEL = 'minimal';
 const SUMMARY_THINKING_LEVEL = 'minimal';
 const RESULT_LIMIT = 50;
 const DATA_PATH = new URL('../public/data_centers.csv', import.meta.url);
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://atisor73.github.io',
+  'https://atisor73.github.io/data-center-viz-llm',
+]);
 
 const ai = process.env.GOOGLE_API_KEY
   ? new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY })
   : null;
 const dataCenters = loadDataCenters(DATA_PATH);
 
-function sendJson(res, status, payload) {
+function getCorsHeaders(req) {
+  const origin = req.headers.origin;
+  const allowOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'https://atisor73.github.io';
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
+  };
+}
+
+function sendJson(req, res, status, payload) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
+    ...getCorsHeaders(req),
   });
   res.end(JSON.stringify(payload));
 }
@@ -51,7 +70,7 @@ async function handleChat(req, res) {
   try {
     payload = JSON.parse(await readBody(req));
   } catch {
-    sendJson(res, 400, {
+    sendJson(req, res, 400, {
       error: 'BAD_REQUEST',
       message: 'Send JSON with a message field.',
     });
@@ -69,10 +88,10 @@ async function handleChat(req, res) {
       summaryThinkingLevel: SUMMARY_THINKING_LEVEL,
     });
 
-    sendJson(res, 200, result);
+    sendJson(req, res, 200, result);
   } catch (error) {
     if (error instanceof ChatbotError) {
-      sendJson(res, error.status, {
+      sendJson(req, res, error.status, {
         error: error.code,
         message: error.message,
       });
@@ -80,7 +99,7 @@ async function handleChat(req, res) {
     }
 
     if (isGeminiRateLimit(error)) {
-      sendJson(res, 429, {
+      sendJson(req, res, 429, {
         error: 'RATE_LIMIT',
         message: 'We ran out of Gemini requests. Please wait one minute and try again.',
       });
@@ -88,7 +107,7 @@ async function handleChat(req, res) {
     }
 
     console.error('Chat request failed:', error);
-    sendJson(res, 500, {
+    sendJson(req, res, 500, {
       error: 'GEMINI_ERROR',
       message: 'The chat service had trouble building a safe SQL query. Please try again.',
     });
@@ -96,12 +115,26 @@ async function handleChat(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, getCorsHeaders(req));
+    res.end();
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/') {
+    sendJson(req, res, 200, {
+      ok: true,
+      service: 'data-center-viz-llm-api',
+    });
+    return;
+  }
+
   if (req.method === 'POST' && req.url === '/api/chat') {
     await handleChat(req, res);
     return;
   }
 
-  sendJson(res, 404, {
+  sendJson(req, res, 404, {
     error: 'NOT_FOUND',
     message: 'Not found.',
   });
